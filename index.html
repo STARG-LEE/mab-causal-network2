@@ -87,17 +87,23 @@ body {
 .sidebar {
   background: var(--bg-secondary);
   border-right: 1px solid var(--border);
-  overflow-y: auto;
-  min-height: 0;  /* CSS Grid에서 스크롤 작동하려면 필수 */
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  position: relative;
+  overflow: hidden;
 }
 
-.sidebar::-webkit-scrollbar { width: 4px; }
-.sidebar::-webkit-scrollbar-track { background: transparent; }
-.sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.sidebar-inner {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sidebar-inner::-webkit-scrollbar { width: 4px; }
+.sidebar-inner::-webkit-scrollbar-track { background: transparent; }
+.sidebar-inner::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
 .panel {
   background: var(--bg-panel);
@@ -432,6 +438,7 @@ input[type="range"]::-webkit-slider-thumb {
 
   <!-- SIDEBAR -->
   <div class="sidebar">
+  <div class="sidebar-inner">
     <!-- CSV Upload -->
     <div class="panel">
       <div class="panel-header">📂 데이터</div>
@@ -533,7 +540,8 @@ input[type="range"]::-webkit-slider-thumb {
         </div>
       </div>
     </div>
-  </div>
+  </div><!-- sidebar-inner -->
+  </div><!-- sidebar -->
 
   <!-- GRAPH -->
   <div class="graph-area" id="graphArea">
@@ -586,12 +594,12 @@ const REL_GROUPS = {
 
 // 노드 카테고리 설정 (계층형 레이아웃용)
 const CATEGORY_CONFIG = {
-  sequence_structure:  { color: '#a78bfa', label: '서열/구조',     xRatio: 0.08 },
-  formulation_factor:  { color: '#34d399', label: '제형 인자',     xRatio: 0.28 },
-  stress_condition:    { color: '#fbbf24', label: '스트레스 조건',  xRatio: 0.28 },
-  degradation_pathway: { color: '#f87171', label: '분해 경로',     xRatio: 0.52 },
-  quality_attribute:   { color: '#60a5fa', label: '품질 지표',     xRatio: 0.76 },
-  clinical_outcome:    { color: '#f472b6', label: '임상 결과',     xRatio: 0.94 },
+  sequence_structure:  { color: '#a78bfa', label: '서열/구조',     xRatio: 0.06 },
+  formulation_factor:  { color: '#34d399', label: '제형 인자',     xRatio: 0.22 },
+  stress_condition:    { color: '#fbbf24', label: '스트레스 조건',  xRatio: 0.38 },
+  degradation_pathway: { color: '#f87171', label: '분해 경로',     xRatio: 0.54 },
+  quality_attribute:   { color: '#60a5fa', label: '품질 지표',     xRatio: 0.72 },
+  clinical_outcome:    { color: '#f472b6', label: '임상 결과',     xRatio: 0.90 },
 };
 const DEFAULT_CATEGORY = 'quality_attribute';
 
@@ -905,14 +913,23 @@ function updateGraph() {
     n.fx = margin.left + cfg.xRatio * usableW;  // fixed x
   });
 
-  // y축: force simulation (y방향만)
+  // y축: force simulation (y방향만, 노드 겹침 방지)
   const simY = d3.forceSimulation(nodes)
-    .force('y', d3.forceY(height / 2).strength(0.05))
-    .force('collision', d3.forceCollide().radius(d => rScale(d.total) + 8))
-    .force('charge', d3.forceManyBody().strength(-80))
+    .force('y', d3.forceY(height / 2).strength(0.03))
+    .force('collision', d3.forceCollide().radius(d => rScale(d.total) + 18).strength(1))
+    .force('charge', d3.forceManyBody().strength(-200))
     .stop();
-  for (let i = 0; i < 200; i++) simY.tick();
+  for (let i = 0; i < 500; i++) simY.tick();
   nodes.forEach(n => { n.x = n.fx; });  // finalize
+
+  // 링크의 source/target을 노드 객체로 연결
+  const nodeById = new Map(nodes.map(n => [n.id, n]));
+  links.forEach(l => {
+    if (typeof l.source === 'string') l.source = nodeById.get(l.source);
+    if (typeof l.target === 'string') l.target = nodeById.get(l.target);
+  });
+  // 양쪽 노드가 모두 존재하는 링크만 유지
+  const validLinks = links.filter(l => l.source && l.target);
 
   // 카테고리 열 라벨 그리기
   const drawnCats = new Set(nodes.map(n => n.category));
@@ -939,7 +956,7 @@ function updateGraph() {
   // Links
   const link = zoomGroup.append('g')
     .selectAll('path')
-    .data(links)
+    .data(validLinks)
     .join('path')
     .attr('class', d => `link ${d.relationship === 'correlates' ? 'link-associated' : ''}`)
     .attr('stroke', d => REL_CONFIG[d.relationship]?.color || '#475569')
@@ -996,7 +1013,7 @@ function updateGraph() {
 
   // Store references for focus
   lastNodes = nodes;
-  lastLinks = links;
+  lastLinks = validLinks;
   lastNodeSel = node;
   lastLinkSel = link;
 
