@@ -948,10 +948,9 @@ function updateGraph() {
   for (let i = 0; i < 500; i++) simY.tick();
   // y좌표를 라벨 아래 ~ 화면 하단으로 제한
   const yMin = margin.top + 20;  // 라벨 아래
-  const yMax = height - margin.bottom;
   nodes.forEach(n => {
     n.x = n.fx;
-    n.y = Math.max(yMin, Math.min(yMax, n.y));
+    n.y = Math.max(yMin, n.y);
   });
 
   // 링크의 source/target을 노드 객체로 연결
