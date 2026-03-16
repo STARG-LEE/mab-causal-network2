@@ -816,6 +816,8 @@ document.getElementById('csvInput').addEventListener('change', (e) => {
 });
 
 function parseCSV(text) {
+  // BOM 제거
+  text = text.replace(/^\ufeff/, '');
   const lines = text.trim().split('\n');
   const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
   return lines.slice(1).map(line => {
@@ -1228,15 +1230,16 @@ const CSV_URL = 'https://raw.githubusercontent.com/STARG-LEE/mab-causal-network/
 
 async function init() {
   try {
-    const response = await fetch(CSV_URL);
+    const response = await fetch(CSV_URL + '?t=' + Date.now());
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const text = await response.text();
     const parsed = parseCSV(text);
 
     if (parsed.length > 0) {
       rawData = parsed;
+      const hasCats = parsed[0].category_cause ? '✅ 카테고리 포함' : '⚠ 카테고리 없음';
       document.getElementById('uploadLabel').innerHTML =
-        `✅ 레포 CSV 로드 완료<br><small style="color:var(--text-muted)">${rawData.length}개 엣지 (다른 CSV 업로드 가능)</small>`;
+        `✅ ${CSV_URL.split('/').pop()}<br><small style="color:var(--text-muted)">로드 완료<br>${rawData.length}개 엣지 · ${hasCats}</small>`;
     } else {
       throw new Error('파싱 결과 없음');
     }
