@@ -540,8 +540,16 @@ input[type="range"]::-webkit-slider-thumb {
             <span>④ 스트레스</span>
           </div>
           <div class="node-legend-item">
+            <div class="node-legend-dot" style="background:#38bdf8"></div>
+            <span>⑤ 안정성 특성</span>
+          </div>
+          <div class="node-legend-item">
             <div class="node-legend-dot" style="background:#f87171"></div>
-            <span>⑤ 안정성</span>
+            <span>⑥ 분해 과정</span>
+          </div>
+          <div class="node-legend-item">
+            <div class="node-legend-dot" style="background:#fb923c"></div>
+            <span>⑦ 품질 결과</span>
           </div>
           <div class="node-legend-item" style="margin-top:4px; padding-top:8px; border-top:1px solid var(--border);">
             <span style="color:var(--text-muted); font-size:11px;">노드 크기 = 언급 빈도 · 화살표 굵기 = 빈도</span>
@@ -602,16 +610,18 @@ const REL_GROUPS = {
   D: { label: '무방향', count: 1 },
 };
 
-// 노드 카테고리 설정: 안정성 예측 (Step 1)
-// 서열 → 구조 → 제형 → 스트레스 → 안정성 검사 결과
+// 노드 카테고리: 안정성을 3단계로 세분화 (7열)
+// 서열 → 구조 → 제형 → 스트레스 → 안정성특성 → 분해과정 → 품질결과
 const CATEGORY_CONFIG = {
-  sequence:    { color: '#c4b5fd', label: '서열',       xRatio: 0.08 },
-  structure:   { color: '#a78bfa', label: '구조',       xRatio: 0.27 },
-  formulation: { color: '#34d399', label: '제형',       xRatio: 0.46 },
-  stress:      { color: '#fbbf24', label: '스트레스',   xRatio: 0.65 },
-  stability:   { color: '#f87171', label: '안정성',     xRatio: 0.87 },
+  sequence:           { color: '#c4b5fd', label: '서열',       xRatio: 0.05 },
+  structure:          { color: '#a78bfa', label: '구조',       xRatio: 0.16 },
+  formulation:        { color: '#34d399', label: '제형',       xRatio: 0.30 },
+  stress:             { color: '#fbbf24', label: '스트레스',   xRatio: 0.44 },
+  stability_property: { color: '#38bdf8', label: '안정성 특성', xRatio: 0.58 },
+  degradation:        { color: '#f87171', label: '분해 과정',   xRatio: 0.73 },
+  quality_outcome:    { color: '#fb923c', label: '품질 결과',   xRatio: 0.90 },
 };
-const DEFAULT_CATEGORY = 'stability';
+const DEFAULT_CATEGORY = 'degradation';
 
 // ============================================================
 // SAMPLE DATA (Step 2가 없어도 바로 데모 가능)
@@ -624,28 +634,28 @@ const SAMPLE_DATA = [
   {cause:"Fc mutation",category_cause:"sequence",effect:"FcRn binding site",category_effect:"structure",relationship:"modifies",frequency:6,num_papers:5,main_confidence:"high",sample_evidence:"Fc mutations alter FcRn binding interface"},
   {cause:"VH/VL sequence",category_cause:"sequence",effect:"CDR conformation",category_effect:"structure",relationship:"determines",frequency:5,num_papers:4,main_confidence:"medium",sample_evidence:"Variable region sequence determines CDR loop conformation"},
   // --- 구조 → 안정성 (구조가 안정성에 영향) ---
-  {cause:"hydrophobic patch",category_cause:"structure",effect:"aggregation",category_effect:"stability",relationship:"promotes",frequency:10,num_papers:8,main_confidence:"high",sample_evidence:"Surface hydrophobic patches promote self-association and aggregation"},
-  {cause:"disulfide bond",category_cause:"structure",effect:"Tm",category_effect:"stability",relationship:"stabilizes",frequency:7,num_papers:7,main_confidence:"high",sample_evidence:"Disulfide bonds stabilize mAb thermal stability"},
-  {cause:"glycan shield",category_cause:"structure",effect:"conformational stability",category_effect:"stability",relationship:"stabilizes",frequency:10,num_papers:10,main_confidence:"high",sample_evidence:"Glycan shield stabilizes mAb conformation"},
-  {cause:"Fab domain",category_cause:"structure",effect:"Tm onset",category_effect:"stability",relationship:"correlates",frequency:6,num_papers:5,main_confidence:"medium",sample_evidence:"Fab thermal stability determines overall Tm onset"},
-  {cause:"charge patch",category_cause:"structure",effect:"colloidal stability",category_effect:"stability",relationship:"destabilizes",frequency:5,num_papers:4,main_confidence:"medium",sample_evidence:"Asymmetric charge patches reduce colloidal stability"},
+  {cause:"hydrophobic patch",category_cause:"structure",effect:"aggregation",category_effect:"degradation",relationship:"promotes",frequency:10,num_papers:8,main_confidence:"high",sample_evidence:"Surface hydrophobic patches promote self-association and aggregation"},
+  {cause:"disulfide bond",category_cause:"structure",effect:"Tm",category_effect:"stability_property",relationship:"stabilizes",frequency:7,num_papers:7,main_confidence:"high",sample_evidence:"Disulfide bonds stabilize mAb thermal stability"},
+  {cause:"glycan shield",category_cause:"structure",effect:"conformational stability",category_effect:"stability_property",relationship:"stabilizes",frequency:10,num_papers:10,main_confidence:"high",sample_evidence:"Glycan shield stabilizes mAb conformation"},
+  {cause:"Fab domain",category_cause:"structure",effect:"Tm onset",category_effect:"stability_property",relationship:"correlates",frequency:6,num_papers:5,main_confidence:"medium",sample_evidence:"Fab thermal stability determines overall Tm onset"},
+  {cause:"charge patch",category_cause:"structure",effect:"colloidal stability",category_effect:"stability_property",relationship:"destabilizes",frequency:5,num_papers:4,main_confidence:"medium",sample_evidence:"Asymmetric charge patches reduce colloidal stability"},
   // --- 제형 → 안정성 (첨가물이 안정성에 영향) ---
-  {cause:"polysorbate 80",category_cause:"formulation",effect:"aggregation",category_effect:"stability",relationship:"inhibits",frequency:20,num_papers:16,main_confidence:"high",sample_evidence:"PS80 inhibits interfacial stress-induced aggregation"},
-  {cause:"sucrose",category_cause:"formulation",effect:"conformational stability",category_effect:"stability",relationship:"stabilizes",frequency:18,num_papers:14,main_confidence:"high",sample_evidence:"Sucrose stabilizes mAb conformation through preferential exclusion"},
-  {cause:"low pH",category_cause:"formulation",effect:"deamidation",category_effect:"stability",relationship:"promotes",frequency:14,num_papers:11,main_confidence:"high",sample_evidence:"Acidic conditions promote asparagine deamidation"},
-  {cause:"low pH",category_cause:"formulation",effect:"aggregation",category_effect:"stability",relationship:"induces",frequency:10,num_papers:10,main_confidence:"high",sample_evidence:"Low pH induces conformational changes and aggregation"},
-  {cause:"trehalose",category_cause:"formulation",effect:"conformational stability",category_effect:"stability",relationship:"stabilizes",frequency:10,num_papers:8,main_confidence:"high",sample_evidence:"Trehalose protects mAb conformation during lyophilization"},
-  {cause:"histidine buffer",category_cause:"formulation",effect:"conformational stability",category_effect:"stability",relationship:"stabilizes",frequency:9,num_papers:7,main_confidence:"medium",sample_evidence:"Histidine buffer at pH 6.0 provides favorable stability"},
-  {cause:"arginine",category_cause:"formulation",effect:"aggregation",category_effect:"stability",relationship:"inhibits",frequency:8,num_papers:6,main_confidence:"high",sample_evidence:"Arginine inhibits protein-protein interaction and aggregation"},
-  {cause:"NaCl",category_cause:"formulation",effect:"colloidal stability",category_effect:"stability",relationship:"modifies",frequency:7,num_papers:5,main_confidence:"medium",sample_evidence:"Ionic strength modulation affects colloidal stability"},
+  {cause:"polysorbate 80",category_cause:"formulation",effect:"aggregation",category_effect:"degradation",relationship:"inhibits",frequency:20,num_papers:16,main_confidence:"high",sample_evidence:"PS80 inhibits interfacial stress-induced aggregation"},
+  {cause:"sucrose",category_cause:"formulation",effect:"conformational stability",category_effect:"stability_property",relationship:"stabilizes",frequency:18,num_papers:14,main_confidence:"high",sample_evidence:"Sucrose stabilizes mAb conformation through preferential exclusion"},
+  {cause:"low pH",category_cause:"formulation",effect:"deamidation",category_effect:"degradation",relationship:"promotes",frequency:14,num_papers:11,main_confidence:"high",sample_evidence:"Acidic conditions promote asparagine deamidation"},
+  {cause:"low pH",category_cause:"formulation",effect:"aggregation",category_effect:"degradation",relationship:"induces",frequency:10,num_papers:10,main_confidence:"high",sample_evidence:"Low pH induces conformational changes and aggregation"},
+  {cause:"trehalose",category_cause:"formulation",effect:"conformational stability",category_effect:"stability_property",relationship:"stabilizes",frequency:10,num_papers:8,main_confidence:"high",sample_evidence:"Trehalose protects mAb conformation during lyophilization"},
+  {cause:"histidine buffer",category_cause:"formulation",effect:"conformational stability",category_effect:"stability_property",relationship:"stabilizes",frequency:9,num_papers:7,main_confidence:"medium",sample_evidence:"Histidine buffer at pH 6.0 provides favorable stability"},
+  {cause:"arginine",category_cause:"formulation",effect:"aggregation",category_effect:"degradation",relationship:"inhibits",frequency:8,num_papers:6,main_confidence:"high",sample_evidence:"Arginine inhibits protein-protein interaction and aggregation"},
+  {cause:"NaCl",category_cause:"formulation",effect:"colloidal stability",category_effect:"stability_property",relationship:"modifies",frequency:7,num_papers:5,main_confidence:"medium",sample_evidence:"Ionic strength modulation affects colloidal stability"},
   // --- 제형 → 구조 (첨가물이 구조를 보호) ---
   {cause:"polysorbate 80",category_cause:"formulation",effect:"hydrophobic patch",category_effect:"structure",relationship:"shields",frequency:13,num_papers:10,main_confidence:"high",sample_evidence:"PS80 shields aggregation-prone hydrophobic patches"},
   // --- 스트레스 → 안정성 (스트레스가 안정성을 해침) ---
-  {cause:"thermal stress",category_cause:"stress",effect:"aggregation",category_effect:"stability",relationship:"promotes",frequency:22,num_papers:18,main_confidence:"high",sample_evidence:"Thermal stress accelerates aggregate formation"},
-  {cause:"light exposure",category_cause:"stress",effect:"oxidation",category_effect:"stability",relationship:"induces",frequency:10,num_papers:7,main_confidence:"high",sample_evidence:"UV light induces Trp and Met oxidation"},
-  {cause:"agitation",category_cause:"stress",effect:"aggregation",category_effect:"stability",relationship:"induces",frequency:17,num_papers:14,main_confidence:"high",sample_evidence:"Mechanical stress induces interfacial aggregation"},
-  {cause:"freeze-thaw",category_cause:"stress",effect:"particle formation",category_effect:"stability",relationship:"induces",frequency:16,num_papers:13,main_confidence:"high",sample_evidence:"Freeze-thaw cycles induce particle formation"},
-  {cause:"storage 40C",category_cause:"stress",effect:"HMW %",category_effect:"stability",relationship:"increases",frequency:8,num_papers:7,main_confidence:"high",sample_evidence:"Accelerated storage at 40C increases HMW species"},
+  {cause:"thermal stress",category_cause:"stress",effect:"aggregation",category_effect:"degradation",relationship:"promotes",frequency:22,num_papers:18,main_confidence:"high",sample_evidence:"Thermal stress accelerates aggregate formation"},
+  {cause:"light exposure",category_cause:"stress",effect:"oxidation",category_effect:"degradation",relationship:"induces",frequency:10,num_papers:7,main_confidence:"high",sample_evidence:"UV light induces Trp and Met oxidation"},
+  {cause:"agitation",category_cause:"stress",effect:"aggregation",category_effect:"degradation",relationship:"induces",frequency:17,num_papers:14,main_confidence:"high",sample_evidence:"Mechanical stress induces interfacial aggregation"},
+  {cause:"freeze-thaw",category_cause:"stress",effect:"particle formation",category_effect:"quality_outcome",relationship:"induces",frequency:16,num_papers:13,main_confidence:"high",sample_evidence:"Freeze-thaw cycles induce particle formation"},
+  {cause:"storage 40C",category_cause:"stress",effect:"HMW %",category_effect:"quality_outcome",relationship:"increases",frequency:8,num_papers:7,main_confidence:"high",sample_evidence:"Accelerated storage at 40C increases HMW species"},
   // --- 스트레스 → 구조 (스트레스가 구조를 변형) ---
   {cause:"thermal stress",category_cause:"stress",effect:"Fab domain",category_effect:"structure",relationship:"unfolds",frequency:12,num_papers:10,main_confidence:"high",sample_evidence:"Elevated temperature causes Fab domain unfolding"},
 ];
@@ -858,28 +868,29 @@ function parseCSV(text) {
 const V3_DIRECT = {
   'formulation_factor': 'formulation',
   'stress_condition': 'stress',
-  'degradation_pathway': 'stability',
 };
 
-// sequence_structure 분리용: 구조적 특성 키워드
-const STRUCTURE_KEYWORDS = ['domain', 'fab', 'fc ', 'fc-', 'fcrn', 'ch2', 'ch3', 'hinge', 'patch', 'hydrophobic', 'charge patch', 'disulfide', 'conformation', 'folding', 'unfolding', 'tertiary', 'quaternary', 'secondary structure', 'beta-sheet', 'loop', 'framework'];
-// sequence 키워드 (나머지는 기본 sequence)
-const SEQUENCE_KEYWORDS = ['amino acid', 'residue', 'cdr', 'mutation', 'variant', 'glycosylation site', 'asn', 'asp', 'met', 'trp', 'lys', 'sequence', 'vh', 'vl', 'vhh', 'scfv', 'nanobod'];
+const STRUCTURE_KEYWORDS = ['domain', 'fab', 'fc ', 'fc-', 'fcrn', 'ch2', 'ch3', 'hinge', 'patch', 'hydrophobic', 'charge patch', 'disulfide', 'conformation', 'folding', 'tertiary', 'quaternary', 'secondary structure', 'beta-sheet', 'loop', 'framework'];
+
+// 안정성 3분할 키워드
+const STAB_PROP_KW = ['conformational stability', 'thermal stability', 'colloidal stability', 'high stability', 'structural stability', 'chemical stability', 'physical stability'];
+const DEGRADATION_KW = ['aggregation', 'deamidation', 'oxidation', 'unfolding', 'fragmentation', 'self-association', 'adsorption', 'degradation', 'isomerization', 'precipitation', 'hydrolysis'];
+const QUALITY_KW = ['charge variant', 'particle formation', 'particle count', 'immunogenicity', 'viscosity', 'high viscosity', 'turbidity', 'potency', 'hmw', 'sec monomer', 'monomer %', 'subvisible'];
 
 function mapCategory(oldCat, nodeName) {
-  // 이미 5개 카테고리이면 그대로
   if (CATEGORY_CONFIG[oldCat]) return oldCat;
   const lower = (nodeName || '').toLowerCase();
-  // v3 직접 매핑
   if (V3_DIRECT[oldCat]) return V3_DIRECT[oldCat];
-  // sequence_structure → sequence 또는 structure 분리
   if (oldCat === 'sequence_structure') {
     if (STRUCTURE_KEYWORDS.some(k => lower.includes(k))) return 'structure';
     return 'sequence';
   }
-  // quality_attribute, clinical_outcome, 기타 → 모두 stability로
-  // (개발가능성/PK/면역원성/임상은 현재 단계에서 안정성으로 통합)
-  return 'stability';
+  // stability, degradation_pathway, quality_attribute, clinical_outcome → 3분할
+  if (STAB_PROP_KW.some(k => lower.includes(k))) return 'stability_property';
+  if (lower === 'stability') return 'stability_property';
+  if (QUALITY_KW.some(k => lower.includes(k))) return 'quality_outcome';
+  if (DEGRADATION_KW.some(k => lower.includes(k))) return 'degradation';
+  return DEFAULT_CATEGORY;
 }
 
 // ============================================================
@@ -1229,7 +1240,7 @@ function applyFocus() {
     });
 
   // Info panel
-  const catLabels = { sequence:'서열', structure:'구조', formulation:'제형', stress:'스트레스', stability:'안정성' };
+  const catLabels = { sequence:'서열', structure:'구조', formulation:'제형', stress:'스트레스', stability_property:'안정성 특성', degradation:'분해 과정', quality_outcome:'품질 결과' };
   const nd = lastNodes.find(n => n.id === focusedNode);
   const catLabel = catLabels[nd?.category] || '';
   const catColor = (CATEGORY_CONFIG[nd?.category] || {}).color || '#888';
