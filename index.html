@@ -311,13 +311,13 @@ input[type="range"]::-webkit-slider-thumb {
 .category-labels-overlay {
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 36px;
+  height: 44px;
   display: flex;
   justify-content: space-around;
   align-items: center;
   z-index: 10;
   pointer-events: none;
-  background: linear-gradient(to bottom, rgba(15,23,42,0.9) 0%, rgba(15,23,42,0.6) 70%, transparent 100%);
+  background: linear-gradient(to bottom, rgba(15,23,42,0.95) 0%, rgba(15,23,42,0.7) 60%, transparent 100%);
   padding: 0 40px;
 }
 
@@ -687,29 +687,26 @@ svg.call(d3.zoom()
   .on('zoom', (e) => zoomGroup.attr('transform', e.transform))
 );
 
-// Arrow markers — 그룹별 다른 모양, 더 크게
+// Arrow markers — 그룹별 다른 모양, 크기 고정
 const defs = svg.append('defs');
 Object.entries(REL_CONFIG).forEach(([key, cfg]) => {
   const marker = defs.append('marker')
     .attr('id', `arrow-${key}`)
     .attr('viewBox', '0 -6 12 12')
-    .attr('refX', 24)
+    .attr('refX', 7)
     .attr('refY', 0)
-    .attr('markerWidth', 10)
-    .attr('markerHeight', 10)
-    .attr('orient', 'auto');
+    .attr('markerWidth', 8)
+    .attr('markerHeight', 8)
+    .attr('orient', 'auto')
+    .attr('markerUnits', 'userSpaceOnUse');
 
   if (cfg.group === 'C') {
-    // 분해 메커니즘: 채워진 삼각형 (더 날카로움)
     marker.append('path').attr('d', 'M0,-5L12,0L0,5Z').attr('fill', cfg.color);
   } else if (cfg.group === 'B') {
-    // 구조/결합: 다이아몬드
     marker.append('path').attr('d', 'M0,0L6,-5L12,0L6,5Z').attr('fill', cfg.color);
   } else if (key === 'correlates') {
-    // 무방향: 원형 (방향 없음 표시)
     marker.append('circle').attr('cx', 6).attr('cy', 0).attr('r', 3).attr('fill', cfg.color);
   } else {
-    // 범용 인과: 표준 화살표
     marker.append('path').attr('d', 'M0,-5L12,0L0,5').attr('fill', cfg.color);
   }
 });
@@ -934,6 +931,21 @@ function updateGraph() {
   const maxTotal = Math.max(...nodes.map(n => n.total), 1);
   const rScale = d3.scaleSqrt().domain([1, maxTotal]).range([6, 30]);
   const wScale = d3.scaleLinear().domain([1, maxFreq]).range([1, 7]);
+  nodes.forEach(n => { n.r = rScale(n.total); });
+
+  function linkPath(d) {
+    const sx = d.source.x, sy = d.source.y;
+    const tx = d.target.x, ty = d.target.y;
+    const dx = tx - sx, dy = ty - sy;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    const sr = d.source.r || 6, tr = d.target.r || 6;
+    const x1 = sx + (dx / dist) * sr;
+    const y1 = sy + (dy / dist) * sr;
+    const x2 = tx - (dx / dist) * (tr + 6);
+    const y2 = ty - (dy / dist) * (tr + 6);
+    const dr = dist * 2;
+    return `M${x1},${y1}A${dr},${dr} 0 0,1 ${x2},${y2}`;
+  }
 
   // Clear
   zoomGroup.selectAll('*').remove();
@@ -961,13 +973,13 @@ function updateGraph() {
 
   // y축: force simulation (y방향만, 노드 겹침 방지)
   const simY = d3.forceSimulation(nodes)
-    .force('y', d3.forceY(height / 2).strength(0.03))
-    .force('collision', d3.forceCollide().radius(d => rScale(d.total) + 18).strength(1))
-    .force('charge', d3.forceManyBody().strength(-200))
+    .force('y', d3.forceY(height / 2).strength(0.02))
+    .force('collision', d3.forceCollide().radius(d => rScale(d.total) + 22).strength(1))
+    .force('charge', d3.forceManyBody().strength(-300))
     .stop();
-  for (let i = 0; i < 500; i++) simY.tick();
+  for (let i = 0; i < 800; i++) simY.tick();
   // y좌표를 라벨 아래 ~ 화면 하단으로 제한
-  const yMin = margin.top + 20;  // 라벨 아래
+  const yMin = margin.top + 40;  // 라벨 오버레이 아래 충분히 여유
   nodes.forEach(n => {
     n.x = n.fx;
     n.y = Math.max(yMin, n.y);
@@ -1017,12 +1029,7 @@ function updateGraph() {
     .attr('stroke-width', d => wScale(d.frequency))
     .attr('stroke-opacity', 0.5)
     .attr('marker-end', d => `url(#arrow-${d.relationship})`)
-    .attr('d', d => {
-      const dx = d.target.x - d.source.x;
-      const dy = d.target.y - d.source.y;
-      const dr = Math.sqrt(dx * dx + dy * dy) * 2;
-      return `M${d.source.x},${d.source.y}A${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
-    })
+    .attr('d', d => linkPath(d))
     .on('mouseover', (event, d) => showEdgeTooltip(event, d))
     .on('mousemove', (event) => moveTooltip(event))
     .on('mouseout', hideTooltip);
