@@ -682,10 +682,24 @@ window.addEventListener('resize', () => { resize(); updateGraph(); });
 
 // Zoom
 const zoomGroup = svg.append('g');
-svg.call(d3.zoom()
-  .scaleExtent([0.2, 5])
-  .on('zoom', (e) => zoomGroup.attr('transform', e.transform))
-);
+const zoomBehavior = d3.zoom()
+  .scaleExtent([0.1, 5])
+  .on('zoom', (e) => zoomGroup.attr('transform', e.transform));
+svg.call(zoomBehavior);
+
+function zoomToFit(nodes, padding = 60) {
+  if (!nodes || nodes.length === 0) return;
+  const xs = nodes.map(n => n.x), ys = nodes.map(n => n.y);
+  const x0 = Math.min(...xs) - padding, x1 = Math.max(...xs) + padding;
+  const y0 = Math.min(...ys) - padding, y1 = Math.max(...ys) + padding;
+  const bw = x1 - x0, bh = y1 - y0;
+  const scale = Math.min(width / bw, height / bh, 1);
+  const tx = (width - bw * scale) / 2 - x0 * scale;
+  const ty = (height - bh * scale) / 2 - y0 * scale;
+  svg.transition().duration(500).call(
+    zoomBehavior.transform, d3.zoomIdentity.translate(tx, ty).scale(scale)
+  );
+}
 
 // Arrow markers — 그룹별 다른 모양, 크기 고정
 const defs = svg.append('defs');
@@ -962,25 +976,38 @@ function updateGraph() {
   }
 
   // ===== 계층형 레이아웃 (카테고리별 x축 배치, y축은 force) =====
-  const margin = { top: 60, bottom: 20, left: 40, right: 40 };
+  const margin = { top: 60, bottom: 40, left: 40, right: 40 };
   const usableW = width - margin.left - margin.right;
-  const usableH = height - margin.top - margin.bottom;
+
+  // 카테고리별 노드 수 세기 → 가장 많은 열 기준으로 높이 결정
+  const catCounts = {};
+  nodes.forEach(n => {
+    const cat = n.category || DEFAULT_CATEGORY;
+    catCounts[cat] = (catCounts[cat] || 0) + 1;
+  });
+  const maxNodesInColumn = Math.max(...Object.values(catCounts), 1);
+  const spacing = 70;  // 노드 간 최소 세로 간격
+  const neededH = margin.top + 60 + maxNodesInColumn * spacing + margin.bottom;
+  const graphH = Math.max(height, neededH);
+
+  // viewBox 높이를 동적으로 조정
+  svg.attr('viewBox', [0, 0, width, graphH]);
 
   // x축: 카테고리별 고정 위치
   nodes.forEach(n => {
     const cfg = CATEGORY_CONFIG[n.category] || CATEGORY_CONFIG[DEFAULT_CATEGORY];
-    n.fx = margin.left + cfg.xRatio * usableW;  // fixed x
+    n.fx = margin.left + cfg.xRatio * usableW;
   });
 
   // y축: force simulation (y방향만, 노드+라벨 겹침 방지)
   const simY = d3.forceSimulation(nodes)
-    .force('y', d3.forceY(height / 2).strength(0.008))
-    .force('collision', d3.forceCollide().radius(d => d.r + 40).strength(1).iterations(4))
-    .force('charge', d3.forceManyBody().strength(-800))
+    .force('y', d3.forceY(graphH / 2).strength(0.01))
+    .force('collision', d3.forceCollide().radius(d => d.r + 35).strength(1).iterations(4))
+    .force('charge', d3.forceManyBody().strength(-600))
     .stop();
-  for (let i = 0; i < 1500; i++) simY.tick();
-  // y좌표를 라벨 아래 ~ 화면 하단으로 제한
-  const yMin = margin.top + 50;  // 라벨 오버레이(44px) + 여유
+  for (let i = 0; i < 1200; i++) simY.tick();
+  // y좌표를 라벨 아래로 제한
+  const yMin = margin.top + 50;
   nodes.forEach(n => {
     n.x = n.fx;
     n.y = Math.max(yMin, n.y);
@@ -1015,7 +1042,7 @@ function updateGraph() {
     const cx = margin.left + cfg.xRatio * usableW;
     zoomGroup.append('rect')
       .attr('x', cx - 55).attr('y', 0)
-      .attr('width', 110).attr('height', height)
+      .attr('width', 110).attr('height', graphH)
       .attr('fill', cfg.color).attr('opacity', 0.03)
       .attr('rx', 8);
   });
@@ -1081,6 +1108,9 @@ function updateGraph() {
 
   // Apply focus if active
   if (focusedNode) applyFocus();
+
+  // 전체 노드가 보이도록 자동 줌
+  zoomToFit(nodes);
 }
 
 // ============================================================
