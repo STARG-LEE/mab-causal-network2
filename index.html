@@ -975,42 +975,40 @@ function updateGraph() {
     return;
   }
 
-  // ===== 계층형 레이아웃 (카테고리별 x축 배치, y축은 force) =====
+  // ===== 계층형 레이아웃: 카테고리별 열, 열 안에서 균등 배치 =====
   const margin = { top: 60, bottom: 40, left: 40, right: 40 };
   const usableW = width - margin.left - margin.right;
 
-  // 카테고리별 노드 수 세기 → 가장 많은 열 기준으로 높이 결정
-  const catCounts = {};
+  // 카테고리별 노드 그룹핑
+  const catGroups = {};
   nodes.forEach(n => {
     const cat = n.category || DEFAULT_CATEGORY;
-    catCounts[cat] = (catCounts[cat] || 0) + 1;
-  });
-  const maxNodesInColumn = Math.max(...Object.values(catCounts), 1);
-  const spacing = 70;  // 노드 간 최소 세로 간격
-  const neededH = margin.top + 60 + maxNodesInColumn * spacing + margin.bottom;
-  const graphH = Math.max(height, neededH);
-
-  // viewBox 높이를 동적으로 조정
-  svg.attr('viewBox', [0, 0, width, graphH]);
-
-  // x축: 카테고리별 고정 위치
-  nodes.forEach(n => {
-    const cfg = CATEGORY_CONFIG[n.category] || CATEGORY_CONFIG[DEFAULT_CATEGORY];
-    n.fx = margin.left + cfg.xRatio * usableW;
+    if (!catGroups[cat]) catGroups[cat] = [];
+    catGroups[cat].push(n);
   });
 
-  // y축: force simulation (y방향만, 노드+라벨 겹침 방지)
-  const simY = d3.forceSimulation(nodes)
-    .force('y', d3.forceY(graphH / 2).strength(0.01))
-    .force('collision', d3.forceCollide().radius(d => d.r + 35).strength(1).iterations(4))
-    .force('charge', d3.forceManyBody().strength(-600))
-    .stop();
-  for (let i = 0; i < 1200; i++) simY.tick();
-  // y좌표를 라벨 아래로 제한
-  const yMin = margin.top + 50;
-  nodes.forEach(n => {
-    n.x = n.fx;
-    n.y = Math.max(yMin, n.y);
+  // 각 그룹을 total(빈도) 내림차순 정렬
+  Object.values(catGroups).forEach(arr => arr.sort((a, b) => b.total - a.total));
+
+  // 가장 많은 열 기준으로 필요 높이 계산
+  const maxCol = Math.max(...Object.values(catGroups).map(a => a.length), 1);
+  const nodeSpacing = 60;
+  const layoutH = Math.max(height, margin.top + 80 + maxCol * nodeSpacing);
+
+  // viewBox는 화면 크기 유지 (zoom으로 맞춤)
+  svg.attr('viewBox', [0, 0, width, height]);
+
+  // 각 노드에 x, y 직접 배정
+  Object.entries(catGroups).forEach(([cat, arr]) => {
+    const cfg = CATEGORY_CONFIG[cat] || CATEGORY_CONFIG[DEFAULT_CATEGORY];
+    const cx = margin.left + cfg.xRatio * usableW;
+    const totalH = (arr.length - 1) * nodeSpacing;
+    const startY = (layoutH - totalH) / 2;
+    arr.forEach((n, i) => {
+      n.x = cx;
+      n.fx = cx;
+      n.y = startY + i * nodeSpacing;
+    });
   });
 
   // 링크의 source/target을 노드 객체로 연결
@@ -1042,7 +1040,7 @@ function updateGraph() {
     const cx = margin.left + cfg.xRatio * usableW;
     zoomGroup.append('rect')
       .attr('x', cx - 55).attr('y', 0)
-      .attr('width', 110).attr('height', graphH)
+      .attr('width', 110).attr('height', layoutH)
       .attr('fill', cfg.color).attr('opacity', 0.03)
       .attr('rx', 8);
   });
