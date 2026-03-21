@@ -972,13 +972,13 @@ function updateGraph() {
     n.fx = margin.left + cfg.xRatio * usableW;  // fixed x
   });
 
-  // y축: force simulation (y방향만, 노드 겹침 방지)
+  // y축: force simulation (y방향만, 노드+라벨 겹침 방지)
   const simY = d3.forceSimulation(nodes)
-    .force('y', d3.forceY(height / 2).strength(0.015))
-    .force('collision', d3.forceCollide().radius(d => d.r + 28).strength(1).iterations(3))
-    .force('charge', d3.forceManyBody().strength(-500))
+    .force('y', d3.forceY(height / 2).strength(0.008))
+    .force('collision', d3.forceCollide().radius(d => d.r + 40).strength(1).iterations(4))
+    .force('charge', d3.forceManyBody().strength(-800))
     .stop();
-  for (let i = 0; i < 1000; i++) simY.tick();
+  for (let i = 0; i < 1500; i++) simY.tick();
   // y좌표를 라벨 아래 ~ 화면 하단으로 제한
   const yMin = margin.top + 50;  // 라벨 오버레이(44px) + 여유
   nodes.forEach(n => {
