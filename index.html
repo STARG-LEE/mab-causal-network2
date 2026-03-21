@@ -693,7 +693,7 @@ Object.entries(REL_CONFIG).forEach(([key, cfg]) => {
   const marker = defs.append('marker')
     .attr('id', `arrow-${key}`)
     .attr('viewBox', '0 -6 12 12')
-    .attr('refX', 7)
+    .attr('refX', 12)
     .attr('refY', 0)
     .attr('markerWidth', 8)
     .attr('markerHeight', 8)
@@ -939,10 +939,11 @@ function updateGraph() {
     const dx = tx - sx, dy = ty - sy;
     const dist = Math.sqrt(dx * dx + dy * dy) || 1;
     const sr = d.source.r || 6, tr = d.target.r || 6;
+    // 소스 가장자리에서 출발, 타겟 가장자리에서 끝
     const x1 = sx + (dx / dist) * sr;
     const y1 = sy + (dy / dist) * sr;
-    const x2 = tx - (dx / dist) * (tr + 6);
-    const y2 = ty - (dy / dist) * (tr + 6);
+    const x2 = tx - (dx / dist) * tr;
+    const y2 = ty - (dy / dist) * tr;
     const dr = dist * 2;
     return `M${x1},${y1}A${dr},${dr} 0 0,1 ${x2},${y2}`;
   }
@@ -961,7 +962,7 @@ function updateGraph() {
   }
 
   // ===== 계층형 레이아웃 (카테고리별 x축 배치, y축은 force) =====
-  const margin = { top: 50, bottom: 20, left: 40, right: 40 };
+  const margin = { top: 60, bottom: 20, left: 40, right: 40 };
   const usableW = width - margin.left - margin.right;
   const usableH = height - margin.top - margin.bottom;
 
@@ -973,13 +974,13 @@ function updateGraph() {
 
   // y축: force simulation (y방향만, 노드 겹침 방지)
   const simY = d3.forceSimulation(nodes)
-    .force('y', d3.forceY(height / 2).strength(0.02))
-    .force('collision', d3.forceCollide().radius(d => rScale(d.total) + 22).strength(1))
-    .force('charge', d3.forceManyBody().strength(-300))
+    .force('y', d3.forceY(height / 2).strength(0.015))
+    .force('collision', d3.forceCollide().radius(d => d.r + 28).strength(1).iterations(3))
+    .force('charge', d3.forceManyBody().strength(-500))
     .stop();
-  for (let i = 0; i < 800; i++) simY.tick();
+  for (let i = 0; i < 1000; i++) simY.tick();
   // y좌표를 라벨 아래 ~ 화면 하단으로 제한
-  const yMin = margin.top + 40;  // 라벨 오버레이 아래 충분히 여유
+  const yMin = margin.top + 50;  // 라벨 오버레이(44px) + 여유
   nodes.forEach(n => {
     n.x = n.fx;
     n.y = Math.max(yMin, n.y);
