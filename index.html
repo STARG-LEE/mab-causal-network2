@@ -1202,18 +1202,18 @@ function applyFocus() {
     if (tid === focusedNode) in1.push(l);
     if (sid === focusedNode) out1.push(l);
   });
-  const hop1nodes = new Set([focusedNode]);
-  in1.forEach(l => hop1nodes.add(l.source.id || l.source));
-  out1.forEach(l => hop1nodes.add(l.target.id || l.target));
+  const hop1in = new Set(in1.map(l => l.source.id || l.source));    // 나에게 들어오는 소스들
+  const hop1out = new Set(out1.map(l => l.target.id || l.target));   // 내가 나가는 타겟들
+  const hop1nodes = new Set([focusedNode, ...hop1in, ...hop1out]);
 
-  // === 2-hop: 1홉 노드들의 연결 (체인 연장) ===
+  // === 2-hop: 같은 방향으로만 확장 ===
   const in2 = [], out2 = [];
   lastLinks.forEach(l => {
     const sid = l.source.id || l.source, tid = l.target.id || l.target;
-    // 나가는 1홉 타겟에서 더 나가는 것
-    if (hop1nodes.has(sid) && sid !== focusedNode && !hop1nodes.has(tid)) out2.push(l);
-    // 들어오는 1홉 소스에 더 들어오는 것
-    if (hop1nodes.has(tid) && tid !== focusedNode && !hop1nodes.has(sid)) in2.push(l);
+    // 나가는 체인: out1 타겟에서 더 나가는 것만 (out1 타겟에 들어오는 다른 것은 무시)
+    if (hop1out.has(sid) && !hop1nodes.has(tid)) out2.push(l);
+    // 들어오는 체인: in1 소스에 더 들어오는 것만 (in1 소스에서 나가는 다른 것은 무시)
+    if (hop1in.has(tid) && !hop1nodes.has(sid)) in2.push(l);
   });
   const hop2nodes = new Set();
   in2.forEach(l => hop2nodes.add(l.source.id || l.source));
