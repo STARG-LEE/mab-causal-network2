@@ -1181,7 +1181,6 @@ function applyFocus() {
   const info = document.getElementById('focusInfo');
 
   if (!focusedNode) {
-    // Unfocus: 모든 요소 복원
     lastNodeSel.select('circle').attr('fill-opacity', 0.85).attr('stroke', 'rgba(255,255,255,0.2)').attr('stroke-width', 1.5);
     lastNodeSel.select('text').attr('fill-opacity', 1);
     lastLinkSel.attr('stroke-opacity', 0.5)
@@ -1196,100 +1195,142 @@ function applyFocus() {
     return;
   }
 
-  // Find connected
-  const connectedNodes = new Set([focusedNode]);
-  const inLinks = [], outLinks = [];
+  // === 1-hop: 직접 연결 ===
+  const in1 = [], out1 = [];
   lastLinks.forEach(l => {
     const sid = l.source.id || l.source, tid = l.target.id || l.target;
-    if (tid === focusedNode) { connectedNodes.add(sid); inLinks.push(l); }
-    if (sid === focusedNode) { connectedNodes.add(tid); outLinks.push(l); }
+    if (tid === focusedNode) in1.push(l);
+    if (sid === focusedNode) out1.push(l);
   });
+  const hop1nodes = new Set([focusedNode]);
+  in1.forEach(l => hop1nodes.add(l.source.id || l.source));
+  out1.forEach(l => hop1nodes.add(l.target.id || l.target));
 
-  // Dim non-connected nodes
+  // === 2-hop: 1홉 노드들의 연결 (체인 연장) ===
+  const in2 = [], out2 = [];
+  lastLinks.forEach(l => {
+    const sid = l.source.id || l.source, tid = l.target.id || l.target;
+    // 나가는 1홉 타겟에서 더 나가는 것
+    if (hop1nodes.has(sid) && sid !== focusedNode && !hop1nodes.has(tid)) out2.push(l);
+    // 들어오는 1홉 소스에 더 들어오는 것
+    if (hop1nodes.has(tid) && tid !== focusedNode && !hop1nodes.has(sid)) in2.push(l);
+  });
+  const hop2nodes = new Set();
+  in2.forEach(l => hop2nodes.add(l.source.id || l.source));
+  out2.forEach(l => hop2nodes.add(l.target.id || l.target));
+
+  // === 엣지 분류용 Set ===
+  const lk = l => (l.source.id||l.source) + '>' + (l.target.id||l.target);
+  const in1Set = new Set(in1.map(lk));
+  const out1Set = new Set(out1.map(lk));
+  const in2Set = new Set(in2.map(lk));
+  const out2Set = new Set(out2.map(lk));
+
+  // === 노드 스타일 ===
   lastNodeSel.select('circle')
-    .attr('fill-opacity', d => connectedNodes.has(d.id) ? 0.95 : 0.06)
+    .attr('fill-opacity', d => {
+      if (d.id === focusedNode) return 1;
+      if (hop1nodes.has(d.id)) return 0.9;
+      if (hop2nodes.has(d.id)) return 0.5;
+      return 0.04;
+    })
     .attr('stroke', d => d.id === focusedNode ? '#fff' : 'rgba(255,255,255,0.15)')
     .attr('stroke-width', d => d.id === focusedNode ? 3 : 1.5);
   lastNodeSel.select('text')
-    .attr('fill-opacity', d => connectedNodes.has(d.id) ? 1 : 0.08);
+    .attr('fill-opacity', d => {
+      if (d.id === focusedNode || hop1nodes.has(d.id)) return 1;
+      if (hop2nodes.has(d.id)) return 0.6;
+      return 0.04;
+    });
 
-  // Links: incoming=위로 커브(파랑), outgoing=아래로 커브(주황), 비연결=투명
-  const inSet = new Set(inLinks.map(l => l.source.id + '→' + l.target.id));
-  const outSet = new Set(outLinks.map(l => l.source.id + '→' + l.target.id));
-
+  // === 엣지 스타일 ===
   lastLinkSel
     .attr('stroke-opacity', d => {
-      const key = (d.source.id||d.source) + '→' + (d.target.id||d.target);
-      return (inSet.has(key) || outSet.has(key)) ? 0.85 : 0;
+      const k = lk(d);
+      if (in1Set.has(k) || out1Set.has(k)) return 0.85;
+      if (in2Set.has(k) || out2Set.has(k)) return 0.4;
+      return 0;
     })
     .attr('stroke', d => {
-      const key = (d.source.id||d.source) + '→' + (d.target.id||d.target);
-      if (inSet.has(key)) return '#38bdf8';
-      if (outSet.has(key)) return '#fb923c';
+      const k = lk(d);
+      if (in1Set.has(k) || in2Set.has(k)) return '#38bdf8';
+      if (out1Set.has(k) || out2Set.has(k)) return '#fb923c';
       return 'none';
     })
     .attr('stroke-width', d => {
-      const key = (d.source.id||d.source) + '→' + (d.target.id||d.target);
-      return (inSet.has(key) || outSet.has(key)) ? 2.5 : 0;
+      const k = lk(d);
+      if (in1Set.has(k) || out1Set.has(k)) return 2.5;
+      if (in2Set.has(k) || out2Set.has(k)) return 1.5;
+      return 0;
     })
     .attr('marker-end', d => {
-      const key = (d.source.id||d.source) + '→' + (d.target.id||d.target);
-      if (inSet.has(key)) return 'url(#arrow-focus-in)';
-      if (outSet.has(key)) return 'url(#arrow-focus-out)';
+      const k = lk(d);
+      if (in1Set.has(k) || in2Set.has(k)) return 'url(#arrow-focus-in)';
+      if (out1Set.has(k) || out2Set.has(k)) return 'url(#arrow-focus-out)';
       return 'none';
     })
     .attr('d', d => {
-      const key = (d.source.id||d.source) + '→' + (d.target.id||d.target);
-      if (!inSet.has(key) && !outSet.has(key)) return linkPath(d);
-      // 들어오는: 위쪽 커브 / 나가는: 아래쪽 커브
+      const k = lk(d);
+      if (!in1Set.has(k) && !out1Set.has(k) && !in2Set.has(k) && !out2Set.has(k)) return linkPath(d);
       const sx = d.source.x, sy = d.source.y, tx = d.target.x, ty = d.target.y;
       const dx = tx - sx, dy = ty - sy;
       const dist = Math.sqrt(dx*dx + dy*dy) || 1;
       const sr = d.source.r || 6, tr = d.target.r || 6;
       const x1 = sx + (dx/dist)*sr, y1 = sy + (dy/dist)*sr;
       const x2 = tx - (dx/dist)*tr, y2 = ty - (dy/dist)*tr;
-      const isIn = inSet.has(key);
-      const dr = dist * (isIn ? 1.2 : 3);  // 들어오는: 더 많이 휘기 / 나가는: 완만
-      const sweep = isIn ? 1 : 0;  // 반대 방향 커브
+      const isIn = in1Set.has(k) || in2Set.has(k);
+      const dr = dist * (isIn ? 1.2 : 3);
+      const sweep = isIn ? 1 : 0;
       return `M${x1},${y1}A${dr},${dr} 0 0,${sweep} ${x2},${y2}`;
     });
 
-  // Info panel
+  // === Info Panel: 체인 표시 ===
   const catLabels = { sequence:'서열', structure:'구조', formulation:'제형', stress:'스트레스', stability:'안정성', quality_outcome:'품질 결과' };
   const nd = lastNodes.find(n => n.id === focusedNode);
   const catLabel = catLabels[nd?.category] || '';
   const catColor = (CATEGORY_CONFIG[nd?.category] || {}).color || '#888';
+  const getCat = id => { const n = lastNodes.find(x => x.id === id); return catLabels[n?.category] || ''; };
 
   let html = `<div class="focus-title">${focusedNode}</div>`;
-  html += `<div style="font-size:11px; color:${catColor}; margin-bottom:8px;">${catLabel}</div>`;
+  html += `<div style="font-size:11px; color:${catColor}; margin-bottom:10px;">${catLabel}</div>`;
 
-  if (inLinks.length > 0) {
-    html += `<div class="focus-section"><div class="focus-section-title" style="color:#38bdf8;">← 원인 (${inLinks.length})</div>`;
-    inLinks.sort((a,b) => b.frequency - a.frequency);
-    inLinks.forEach(e => {
-      const cfg = REL_CONFIG[e.relationship] || {};
-      const src = e.source.id || e.source;
-      const srcCat = lastNodes.find(n => n.id === src);
-      const sc = catLabels[srcCat?.category] || '';
-      html += `<div class="focus-edge"><span style="color:var(--text-muted);font-size:9px;">[${sc}]</span> ${src} <span class="focus-edge-rel" style="background:#38bdf822; color:#38bdf8">${e.relationship}</span> <span style="color:var(--text-muted)">(${e.frequency})</span></div>`;
-    });
-    html += `</div>`;
-  }
-
-  if (outLinks.length > 0) {
-    html += `<div class="focus-section"><div class="focus-section-title" style="color:#fb923c;">→ 결과 (${outLinks.length})</div>`;
-    outLinks.sort((a,b) => b.frequency - a.frequency);
-    outLinks.forEach(e => {
-      const cfg = REL_CONFIG[e.relationship] || {};
+  // 체인: A → [focusedNode] → B → C (나가는 방향)
+  if (out1.length > 0) {
+    html += `<div class="focus-section"><div class="focus-section-title" style="color:#fb923c;">→ 영향 체인</div>`;
+    out1.sort((a,b) => b.frequency - a.frequency);
+    out1.forEach(e => {
       const tgt = e.target.id || e.target;
-      const tgtCat = lastNodes.find(n => n.id === tgt);
-      const tc = catLabels[tgtCat?.category] || '';
-      html += `<div class="focus-edge"><span class="focus-edge-rel" style="background:#fb923c22; color:#fb923c">${e.relationship}</span> ${tgt} <span style="color:var(--text-muted);font-size:9px;">[${tc}]</span> <span style="color:var(--text-muted)">(${e.frequency})</span></div>`;
+      html += `<div class="focus-edge" style="font-weight:500;"><span style="color:#fb923c;">${e.relationship}</span> → ${tgt} <span style="color:var(--text-muted);font-size:9px;">[${getCat(tgt)}]</span> <span style="color:var(--text-muted);">(${e.frequency})</span></div>`;
+      // 2홉: tgt에서 더 나가는 체인
+      const next = out2.filter(l2 => (l2.source.id||l2.source) === tgt);
+      next.sort((a,b) => b.frequency - a.frequency);
+      next.slice(0, 5).forEach(e2 => {
+        const tgt2 = e2.target.id || e2.target;
+        html += `<div style="font-size:10px; margin-left:16px; padding:2px 0; color:var(--text-muted);">↳ <span style="color:#fb923c80;">${e2.relationship}</span> → ${tgt2} <span style="font-size:9px;">[${getCat(tgt2)}]</span></div>`;
+      });
     });
     html += `</div>`;
   }
 
-  html += `<button class="focus-clear" onclick="focusedNode=null; applyFocus();">✕ 포커스 해제</button>`;
+  // 체인: C → B → [focusedNode] (들어오는 방향)
+  if (in1.length > 0) {
+    html += `<div class="focus-section"><div class="focus-section-title" style="color:#38bdf8;">← 원인 체인</div>`;
+    in1.sort((a,b) => b.frequency - a.frequency);
+    in1.forEach(e => {
+      const src = e.source.id || e.source;
+      html += `<div class="focus-edge" style="font-weight:500;">${src} <span style="color:var(--text-muted);font-size:9px;">[${getCat(src)}]</span> <span style="color:#38bdf8;">${e.relationship}</span> → <span style="color:var(--text-muted);">(${e.frequency})</span></div>`;
+      // 2홉: src에 더 들어오는 체인
+      const prev = in2.filter(l2 => (l2.target.id||l2.target) === src);
+      prev.sort((a,b) => b.frequency - a.frequency);
+      prev.slice(0, 5).forEach(e2 => {
+        const src2 = e2.source.id || e2.source;
+        html += `<div style="font-size:10px; margin-left:16px; padding:2px 0; color:var(--text-muted);">↳ ${src2} <span style="font-size:9px;">[${getCat(src2)}]</span> <span style="color:#38bdf880;">${e2.relationship}</span></div>`;
+      });
+    });
+    html += `</div>`;
+  }
+
+  html += `<button class="focus-clear" onclick="focusedNode=null; applyFocus();">포커스 해제</button>`;
   info.innerHTML = html;
   panel.style.display = 'block';
 }
